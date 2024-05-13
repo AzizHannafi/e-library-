@@ -16,12 +16,24 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[Route('/reservation')]
 class ReservationController extends AbstractController
 {
-    #[IsGranted("ROLE_ADMIN")]
+
     #[Route('/', name: 'app_reservation_index', methods: ['GET'])]
     public function index(ReservationRepository $reservationRepository): Response
     {
+        $user = $this->getUser();
+
+        if ($user) {
+            if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+                $reservations = $reservationRepository->findAll();
+            } else {
+                $userId = $user->getId();
+                $reservations = $reservationRepository->findBy(['user' => $userId]);
+            }
+        } else {
+            $reservations = [];
+        }
         return $this->render('reservation/index.html.twig', [
-            'reservations' => $reservationRepository->findAll(),
+            'reservations' => $reservations,
         ]);
     }
 
