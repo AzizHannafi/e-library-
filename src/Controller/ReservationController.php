@@ -44,6 +44,16 @@ class ReservationController extends AbstractController
         $form = $this->createForm(ReservationType::class, $reservation);
         $form->handleRequest($request);
 
+        $userReservationsCount = $entityManager->getRepository(Reservation::class)->count([
+            'user' => $this->getUser()->getId()
+        ]);
+
+        if ($userReservationsCount >= 3) {
+
+            $this->addFlash('error', 'You cannot make more than 3 reservations.');
+            return $this->redirectToRoute('app_reservation_index');
+        }
+
         if ($form->isSubmitted() && $form->isValid()) {
             $reservation->setUser($this->getUser());
             $reservation->setEtat("Pending");
@@ -55,8 +65,7 @@ class ReservationController extends AbstractController
         }
 
         return $this->render('reservation/new.html.twig', [
-            'reservation' => $reservation,
-            'form' => $form,
+            'form' => $form->createView(),
         ]);
     }
 
