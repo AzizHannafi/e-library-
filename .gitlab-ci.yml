@@ -1,0 +1,73 @@
+stages:
+  - prepare
+  - test
+  - deploy
+
+variables:
+  APP_ENV: test
+  DATABASE_URL: 'mysql://root:password@mysql:3306/test_db?serverVersion=5.7'
+
+cache:
+  paths:
+    - vendor/
+
+services:
+  - name: mysql:5.7
+    alias: mysql
+
+prepare:
+  stage: prepare
+  image: php:7.4-fpm
+  script:
+    - apt-get update -y
+    - apt-get install -y git unzip zip libpng-dev libjpeg-dev libfreetype6-dev
+    - docker-php-ext-configure gd --with-freetype --with-jpeg
+    - docker-php-ext-install gd
+    - docker-php-ext-install pdo pdo_mysql
+    - curl -sS https://getcomposer.org/installer | php
+    - mv composer.phar /usr/local/bin/composer
+  artifacts:
+    paths:
+      - vendor/
+
+install_dependencies:
+  stage: prepare
+  image: php:7.4-fpm
+  script:
+    - composer install --prefer-dist --no-progress --no-interaction
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - vendor/
+  artifacts:
+    paths:
+      - vendor/
+
+test:
+  stage: test
+  image: php:7.4-fpm
+  script:
+    - apt-get update -y
+    - apt-get install -y mysql-client
+    - wait-for-it mysql:3306 -t 30 -- echo "MySQL is up"
+    - php bin/console doctrine:database:create --env=test
+    - php bin/console doctrine:schema:update --force --env=test
+    - php bin/phpunit
+  artifacts:
+    when: always
+    reports:
+      junit: var/junit.xml
+    paths:
+      - var/logs/
+  dependencies:
+    - install_dependencies
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying to production server..."
+  environment:
+    name: production
+  only:
+    - main
+
